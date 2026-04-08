@@ -1,5 +1,5 @@
 {
-  "name": "dashboard",
+  "name": "quadro-controlo",
   "private": true,
   "scripts": {
     "dev": "next dev"
