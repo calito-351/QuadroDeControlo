@@ -3,10 +3,9 @@ import { supabase } from "../lib/supabase";
 
 export default function Home() {
   const [session, setSession] = useState(null);
-  const [services, setServices] = useState([]);
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [projects, setProjects] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [newProject, setNewProject] = useState("");
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -19,43 +18,49 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (session) loadServices();
+    if (session) loadProjects();
   }, [session]);
 
-  async function loadServices() {
+  async function loadProjects() {
     const { data } = await supabase.from("services").select("*");
-    setServices(data || []);
+    setProjects(data || []);
   }
 
-  async function addService() {
-    if (!name) return;
+  async function addProject() {
+    if (!newProject) return;
 
     await supabase.from("services").insert({
-      name,
+      name: newProject,
       kpis: { progresso: 0, risco: "baixo" },
-      timeline: []
+      timeline: [],
+      tasks: [
+        { title: "Tarefa 1", status: "todo" }
+      ]
     });
 
-    setName("");
-    loadServices();
+    setNewProject("");
+    loadProjects();
   }
 
-  async function updateProgress(id, value, kpis) {
+  async function updateTasks(project, tasks) {
     await supabase
       .from("services")
-      .update({ kpis: { ...kpis, progresso: value } })
-      .eq("id", id);
+      .update({ tasks })
+      .eq("id", project.id);
 
-    loadServices();
+    loadProjects();
   }
 
-  async function updateRisk(id, value, kpis) {
-    await supabase
-      .from("services")
-      .update({ kpis: { ...kpis, risco: value } })
-      .eq("id", id);
+  function moveTask(project, taskIndex, newStatus) {
+    const tasks = [...(project.tasks || [])];
+    tasks[taskIndex].status = newStatus;
+    updateTasks(project, tasks);
+  }
 
-    loadServices();
+  async function addTask(project) {
+    const tasks = [...(project.tasks || [])];
+    tasks.push({ title: "Nova tarefa", status: "todo" });
+    updateTasks(project, tasks);
   }
 
   async function logout() {
@@ -63,37 +68,21 @@ export default function Home() {
   }
 
   if (!session) {
+    let email = "";
+    let password = "";
+
     return (
-      <div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center", background: "#f5f5f5" }}>
-        <div style={{ padding: 30, background: "white", borderRadius: 10, width: 300 }}>
-          <h2 style={{ textAlign: "center" }}>Login</h2>
-
-          <input
-            placeholder="Email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            style={{ width: "100%", marginBottom: 10 }}
-          />
-
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            style={{ width: "100%", marginBottom: 10 }}
-          />
-
-          <button
-            style={{ width: "100%", background: "#007bff", color: "white", marginBottom: 10 }}
-            onClick={() => supabase.auth.signInWithPassword({ email, password })}
-          >
+      <div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ padding: 30, border: "1px solid #ccc" }}>
+          <h2>Login</h2>
+          <input placeholder="Email" onChange={e => (email = e.target.value)} />
+          <br />
+          <input type="password" placeholder="Password" onChange={e => (password = e.target.value)} />
+          <br />
+          <button onClick={() => supabase.auth.signInWithPassword({ email, password })}>
             Entrar
           </button>
-
-          <button
-            style={{ width: "100%", background: "#6c757d", color: "white" }}
-            onClick={() => supabase.auth.signUp({ email, password })}
-          >
+          <button onClick={() => supabase.auth.signUp({ email, password })}>
             Criar Conta
           </button>
         </div>
@@ -102,76 +91,85 @@ export default function Home() {
   }
 
   return (
-    <div style={{ padding: 20, background: "#f0f2f5", minHeight: "100vh" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
-        <h1>Dashboard</h1>
-        <button onClick={logout}>Logout</button>
-      </div>
+    <div style={{ display: "flex", height: "100vh" }}>
+      
+      {/* SIDEBAR */}
+      <div style={{ width: 250, background: "#1f2937", color: "white", padding: 15 }}>
+        <h2>Projetos</h2>
 
-      <div style={{ marginBottom: 20 }}>
         <input
-          value={name}
-          onChange={e => setName(e.target.value)}
-          placeholder="Novo serviço"
+          value={newProject}
+          onChange={e => setNewProject(e.target.value)}
+          placeholder="Novo projeto"
+          style={{ width: "100%", marginBottom: 10 }}
         />
-        <button onClick={addService}>Adicionar</button>
+        <button onClick={addProject}>Criar</button>
+
+        <div style={{ marginTop: 20 }}>
+          {projects.map(p => (
+            <div
+              key={p.id}
+              onClick={() => setSelected(p)}
+              style={{
+                padding: 10,
+                cursor: "pointer",
+                background: selected?.id === p.id ? "#374151" : "transparent"
+              }}
+            >
+              {p.name}
+            </div>
+          ))}
+        </div>
+
+        <button onClick={logout} style={{ marginTop: 20 }}>
+          Logout
+        </button>
       </div>
 
-      {services.map(s => (
-        <div
-          key={s.id}
-          style={{
-            background: "white",
-            padding: 15,
-            marginBottom: 10,
-            borderRadius: 10,
-            boxShadow: "0 2px 5px rgba(0,0,0,0.1)"
-          }}
-        >
-          <h3>{s.name}</h3>
+      {/* MAIN */}
+      <div style={{ flex: 1, padding: 20, background: "#f3f4f6" }}>
+        {!selected ? (
+          <h2>Seleciona um projeto</h2>
+        ) : (
+          <>
+            <h1>{selected.name}</h1>
 
-          <div>
-            <strong>Progresso:</strong> {s.kpis?.progresso || 0}%
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={s.kpis?.progresso || 0}
-              onChange={e =>
-                updateProgress(s.id, Number(e.target.value), s.kpis)
-              }
-            />
-          </div>
-
-          <div>
-            <strong>Risco:</strong>
-            {["baixo", "medio", "alto"].map(r => (
-              <button
-                key={r}
-                style={{
-                  marginLeft: 5,
-                  background:
-                    r === "alto"
-                      ? "red"
-                      : r === "medio"
-                      ? "orange"
-                      : "green",
-                  color: "white"
-                }}
-                onClick={() => updateRisk(s.id, r, s.kpis)}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
-
-          {s.kpis?.progresso < 50 && s.kpis?.risco === "alto" && (
-            <div style={{ color: "red", marginTop: 10 }}>
-              Projeto em risco
+            {/* KPI */}
+            <div style={{ marginBottom: 20 }}>
+              <strong>Progresso:</strong> {selected.kpis?.progresso || 0}%
             </div>
-          )}
-        </div>
-      ))}
+
+            {/* KANBAN */}
+            <div style={{ display: "flex", gap: 20 }}>
+              
+              {["todo", "doing", "done"].map(status => (
+                <div key={status} style={{ flex: 1, background: "white", padding: 10 }}>
+                  <h3>{status.toUpperCase()}</h3>
+
+                  {(selected.tasks || [])
+                    .filter(t => t.status === status)
+                    .map((t, i) => (
+                      <div key={i} style={{ border: "1px solid #ccc", padding: 5, marginBottom: 5 }}>
+                        {t.title}
+
+                        <div>
+                          {["todo", "doing", "done"].map(s => (
+                            <button key={s} onClick={() => moveTask(selected, i, s)}>
+                              {s}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+
+                  <button onClick={() => addTask(selected)}>+ Tarefa</button>
+                </div>
+              ))}
+
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
