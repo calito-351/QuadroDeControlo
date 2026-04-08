@@ -389,16 +389,3 @@ async function handleUpload(e, serviceId) {
 
   alert("Upload feito");
 }
-
-await supabase.from("services").insert({...});
-
-await supabase.from("notifications").insert({
-  user_id: session.user.id,
-  text: "Novo serviço criado"
-});
-
-await supabase.from("notifications").insert({
-  user_id: session.user.id,
-  text: "Ficheiro adicionado ao projeto"
-});
-
