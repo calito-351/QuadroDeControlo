@@ -301,3 +301,104 @@ const styles = {
     gap: 10
   }
 };
+
+async function createOrgIfNotExists(user) {
+  const { data } = await supabase
+    .from("memberships")
+    .select("*")
+    .eq("user_id", user.id);
+
+  if (!data.length) {
+    const { data: org } = await supabase
+      .from("organizations")
+      .insert({ name: "Minha Empresa" })
+      .select()
+      .single();
+
+    await supabase.from("memberships").insert({
+      user_id: user.id,
+      org_id: org.id,
+      role: "admin"
+    });
+  }
+}
+
+await supabase.from("services").insert({
+  name,
+  org_id: orgId,
+  kpis: { progresso: 0, risco: "baixo" }
+});
+
+await supabase.from("invites").insert({
+  email: "user@email.com",
+  org_id: orgId,
+  role: "member"
+});
+
+const { data: invites } = await supabase
+  .from("invites")
+  .select("*")
+  .eq("email", user.email)
+  .eq("accepted", false);
+
+for (let invite of invites) {
+  await supabase.from("memberships").insert({
+    user_id: user.id,
+    org_id: invite.org_id,
+    role: invite.role
+  });
+
+  await supabase
+    .from("invites")
+    .update({ accepted: true })
+    .eq("id", invite.id);
+}
+
+<input
+  type="file"
+  onChange={e => handleUpload(e, s.id)}
+/>
+
+async function handleUpload(e, serviceId) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const filePath = `${serviceId}/${file.name}`;
+
+  // Upload para storage
+  const { error } = await supabase.storage
+    .from("files")
+    .upload(filePath, file);
+
+  if (error) {
+    console.log("Erro upload:", error.message);
+    return;
+  }
+
+  // Obter URL público
+  const { data } = supabase.storage
+    .from("files")
+    .getPublicUrl(filePath);
+
+  // Guardar na base de dados
+  await supabase.from("files").insert({
+    service_id: serviceId,
+    file_url: data.publicUrl,
+    name: file.name
+  });
+
+  alert("Upload feito");
+}
+
+await supabase.from("services").insert({...});
+
+await supabase.from("notifications").insert({
+  user_id: session.user.id,
+  text: "Novo serviço criado"
+});
+
+await supabase.from("notifications").insert({
+  user_id: session.user.id,
+  text: "Ficheiro adicionado ao projeto"
+});
+
